@@ -2,7 +2,7 @@ import httpx
 
 from app.core.config import get_settings
 from app.models import Item
-from app.services.currency import format_yen_cny
+from app.services.currency import format_price
 
 
 def format_feishu_text(item: Item) -> str:
@@ -13,7 +13,7 @@ def format_feishu_text(item: Item) -> str:
     return (
         f"[Anpanman {item.alert_level}级提醒] {item.title}\n"
         f"平台: {item.platform}\n"
-        f"价格: {format_yen_cny(item.price_yen)}\n"
+        f"价格: {format_price(item.original_price, item.original_currency, item.price_yen)}\n"
         f"发布时间: {item.publish_time or '未知'}\n"
         f"稀缺分: {item.scarcity_score}\n"
         f"预估毛利: {margin}\n"

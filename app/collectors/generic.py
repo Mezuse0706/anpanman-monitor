@@ -1,9 +1,54 @@
 import json
+import re
 
 from bs4 import BeautifulSoup
 
 from app.collectors.base import PlatformConfig, PublicPageCollector, now_utc, parse_price_yen
 from app.schemas import RawItem
+
+SUPPORTED_CURRENCIES = ("JPY", "HKD")
+NON_SUPPORTED_MARKERS = ("USD", "RMB", "CNY", "CN¥", "$")
+JPY_MARKERS = ("JPY", "￥", "¥", "円")
+
+
+def _looks_like_non_jpy(text: str) -> bool:
+    normalized = text.upper()
+    return any(marker in normalized for marker in NON_SUPPORTED_MARKERS)
+
+
+def _looks_like_jpy(text: str) -> bool:
+    normalized = text.upper()
+    return any(marker in normalized for marker in JPY_MARKERS)
+
+
+def _parse_decimal_price(text: str) -> float:
+    match = re.search(r"(\d[\d,]*)(?:[.\s]+(\d{1,2}))?", text)
+    if not match:
+        return 0.0
+    whole = match.group(1).replace(",", "")
+    fraction = match.group(2) or ""
+    return float(f"{whole}.{fraction}") if fraction else float(whole)
+
+
+def _parse_card_price(platform: str, card_text: str, price_text: str) -> tuple[int, float | None, str]:
+    if _looks_like_non_jpy(card_text):
+        return 0, None, "JPY"
+
+    upper_card = card_text.upper()
+    if "HKD" in upper_card:
+        from app.services.currency import hkd_to_yen
+
+        hkd = _parse_decimal_price(card_text.split("HKD", 1)[1])
+        return hkd_to_yen(hkd), hkd, "HKD"
+
+    compact = re.sub(r"\s+", "", price_text)
+    if "￥" in compact or "¥" in compact or "円" in compact:
+        yen = parse_price_yen(compact)
+        return yen, float(yen), "JPY"
+    if platform == "amazon_japan":
+        return 0, None, "JPY"
+    yen = parse_price_yen(compact)
+    return yen, float(yen), "JPY"
 
 
 def _extract_json_ld_items(soup: BeautifulSoup, keyword: str, platform: str) -> list[RawItem]:
@@ -44,10 +89,19 @@ def _extract_json_ld_items(soup: BeautifulSoup, keyword: str, platform: str) -> 
                 price_str = "0"
                 currency = ""
 
-            if currency and currency not in ("JPY", "JP", ""):
+            currency = (currency or "JPY").upper()
+            if currency and currency not in SUPPORTED_CURRENCIES:
+                continue
+            if _looks_like_non_jpy(f"{currency} {price_str}"):
                 continue
 
-            price = parse_price_yen(price_str)
+            original_price = _parse_decimal_price(price_str)
+            if currency == "HKD":
+                from app.services.currency import hkd_to_yen
+
+                price = hkd_to_yen(original_price)
+            else:
+                price = parse_price_yen(price_str)
             if price <= 0:
                 continue
 
@@ -67,6 +121,8 @@ def _extract_json_ld_items(soup: BeautifulSoup, keyword: str, platform: str) -> 
                 keyword=keyword,
                 title=name,
                 price_yen=price,
+                original_price=original_price,
+                original_currency=currency,
                 shipping_fee=0,
                 publish_time=now_utc(),
                 seller="",
@@ -124,7 +180,11 @@ class GenericCardCollector(PublicPageCollector):
             if not title_el or not price_el or not link_el:
                 continue
 
-            price = parse_price_yen(price_el.get_text(" ", strip=True))
+            price, original_price, original_currency = _parse_card_price(
+                self.config.name,
+                card.get_text(" ", strip=True),
+                price_el.get_text(" ", strip=True),
+            )
             href = link_el.get("href", "")
             if not href or price <= 0:
                 continue
@@ -139,6 +199,8 @@ class GenericCardCollector(PublicPageCollector):
                     keyword=keyword,
                     title=title_el.get_text(" ", strip=True),
                     price_yen=price,
+                    original_price=original_price,
+                    original_currency=original_currency,
                     shipping_fee=0,
                     publish_time=now_utc(),
                     seller="",
@@ -167,4 +229,3 @@ class RakutenCollector(GenericCardCollector):
 
 class AmazonJapanCollector(GenericCardCollector):
     config = PlatformConfig("amazon_japan", "https://www.amazon.co.jp", "/s?k={keyword}")
-

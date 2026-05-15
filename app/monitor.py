@@ -105,6 +105,8 @@ async def ingest_items(db: Session, raw_items: Iterable[RawItem]) -> dict[str, i
             title=raw.title,
             seller=raw.seller,
             price_yen=raw.price_yen,
+            original_price=raw.original_price,
+            original_currency=raw.original_currency,
             shipping_fee=raw.shipping_fee,
             publish_time=raw.publish_time,
             seller_rating=raw.seller_rating,

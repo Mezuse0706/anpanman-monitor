@@ -31,6 +31,8 @@ class ItemOut(BaseModel):
     title: str
     seller: str
     price_yen: int
+    original_price: float | None
+    original_currency: str
     shipping_fee: int
     publish_time: datetime | None
     seller_rating: float | None
@@ -69,6 +71,8 @@ class RawItem(BaseModel):
     keyword: str
     title: str
     price_yen: int
+    original_price: float | None = None
+    original_currency: str = "JPY"
     shipping_fee: int = 0
     publish_time: datetime | None = None
     seller: str = ""

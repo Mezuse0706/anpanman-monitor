@@ -16,7 +16,7 @@ from app.monitor import run_monitor_once
 from app.schemas import ItemOut, KeywordCreate, KeywordImport, KeywordOut, ProfitInput, ProfitOutput
 from sqlalchemy import func as sqlfunc
 
-from app.services.currency import format_yen_cny
+from app.services.currency import format_price
 from app.services.history import price_stats, sku_from_title
 from app.services.notifications import send_feishu_test_message
 from app.services.profit import calculate_profit
@@ -44,6 +44,11 @@ def seed_default_keywords(db: Session) -> None:
     db.commit()
 
 
+def cleanup_known_bad_prices(db: Session) -> None:
+    db.query(Item).filter(Item.platform == "amazon_japan", Item.price_yen < 100, Item.original_currency == "JPY").delete()
+    db.commit()
+
+
 async def monitor_loop() -> None:
     settings = get_settings()
     while True:
@@ -61,6 +66,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         seed_default_keywords(db)
+        cleanup_known_bad_prices(db)
     finally:
         db.close()
 
@@ -159,7 +165,7 @@ def dashboard(db: Session = Depends(get_db)) -> HTMLResponse:
   <section class="stack">
     <div class="panel">
       <h2>控制台</h2>
-      <p class="muted">飞书：{feishu_status}；后台轮询：每 {settings.monitor_interval_seconds} 秒；价格显示为日元并按汇率约算人民币。</p>
+      <p class="muted">飞书：{feishu_status}；后台轮询：每 {settings.monitor_interval_seconds} 秒；价格保留原始币种，并约算人民币/日元。</p>
       <div class="row">
         <form method="post" action="/web/monitor/run-once"><button type="submit">立即监控一次</button></form>
         <form method="post" action="/web/alerts/test"><button class="secondary" type="submit">测试飞书提醒</button></form>
@@ -219,7 +225,7 @@ def render_item(item: Item) -> str:
   </div>
   <div class="meta muted">
     <span>{escape(item.platform)}</span>
-    <span>{escape(format_yen_cny(item.price_yen))}</span>
+    <span>{escape(format_price(item.original_price, item.original_currency, item.price_yen))}</span>
     <span>{escape(item.keyword)}</span>
     <span>毛利：<span class="{margin_class}">{margin}</span></span>
   </div>

@@ -33,6 +33,8 @@ class Item(Base):
     title: Mapped[str] = mapped_column(Text)
     seller: Mapped[str] = mapped_column(String(160), default="")
     price_yen: Mapped[int] = mapped_column(Integer)
+    original_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    original_currency: Mapped[str] = mapped_column(String(12), default="JPY")
     shipping_fee: Mapped[int] = mapped_column(Integer, default=0)
     publish_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     seller_rating: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -61,4 +63,3 @@ class HistoricalPrice(Base):
     price: Mapped[int] = mapped_column(Integer)
     date: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-

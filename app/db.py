@@ -1,6 +1,6 @@
 from collections.abc import Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import get_settings
@@ -39,3 +39,21 @@ def init_db() -> None:
     from app import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    add_missing_columns()
+
+
+def add_missing_columns() -> None:
+    inspector = inspect(engine)
+    if "items" not in inspector.get_table_names():
+        return
+    existing = {column["name"] for column in inspector.get_columns("items")}
+    statements = []
+    if "original_price" not in existing:
+        statements.append("ALTER TABLE items ADD COLUMN original_price FLOAT")
+    if "original_currency" not in existing:
+        statements.append("ALTER TABLE items ADD COLUMN original_currency VARCHAR(12) DEFAULT 'JPY'")
+    if not statements:
+        return
+    with engine.begin() as connection:
+        for statement in statements:
+            connection.execute(text(statement))
