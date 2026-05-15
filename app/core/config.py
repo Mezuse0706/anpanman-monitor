@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     http_user_agent: str = "AnpanmanScarcityMonitor/0.1 (+public-page-monitor)"
     feishu_webhook_url: str = ""
     alert_min_gross_margin_percent: float = 30.0
+    jpy_to_cny_rate: float = 0.048
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

@@ -8,6 +8,7 @@ from app.collectors.base import FetchStats, PublicPageCollector, parse_price_yen
 from app.collectors.generic import _extract_json_ld_items
 from app.monitor import aggregate_fetch_stats
 from app.schemas import ProfitInput, RawItem
+from app.services.currency import format_yen_cny, yen_to_cny
 from app.services.dedupe import build_dedupe_key
 from app.services.profit import calculate_profit
 from app.services.scoring import RARE_TERMS, _age_minutes, score_item
@@ -40,6 +41,11 @@ def test_profit_marks_low_margin() -> None:
     assert result.landed_cost == 7300
     assert result.gross_margin == 700
     assert result.low_margin is True
+
+
+def test_currency_format_uses_jpy_and_cny() -> None:
+    assert yen_to_cny(1000) == 48.0
+    assert format_yen_cny(1000) == "JPY 1,000 / 约 RMB 48.00"
 
 
 # ── scoring helpers ────────────────────────────────────────────────────

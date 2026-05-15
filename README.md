@@ -43,6 +43,7 @@ FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/xxxxx
 FEISHU_WEBHOOK_URL=你的飞书机器人Webhook
 MONITOR_INTERVAL_SECONDS=300
 ENABLE_BACKGROUND_MONITOR=true
+JPY_TO_CNY_RATE=0.048
 ```
 
 4. Railway 会使用 `railway.json` 启动：
@@ -73,4 +74,3 @@ uvicorn app.main:app --host 0.0.0.0 --port $PORT
 - 绕过验证码
 - 模拟真人点击
 - 绕过 robots 或平台限制
-
