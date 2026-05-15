@@ -10,7 +10,7 @@ def format_feishu_text(item: Item) -> str:
         margin = f"{item.gross_margin_percent:.2f}%"
 
     return (
-        f"[{item.alert_level}级提醒] {item.title}\n"
+        f"[Anpanman {item.alert_level}级提醒] {item.title}\n"
         f"平台: {item.platform}\n"
         f"价格: ¥{item.price_yen}\n"
         f"发布时间: {item.publish_time or '未知'}\n"
