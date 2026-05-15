@@ -18,6 +18,17 @@ class PlatformConfig:
     search_path: str
 
 
+@dataclass
+class FetchStats:
+    """Per (collector, keyword) fetch statistics."""
+    platform: str
+    keyword: str
+    success: bool
+    robots_blocked: bool = False
+    items_found: int = 0
+    error: str | None = None
+
+
 class PublicPageCollector(ABC):
     config: PlatformConfig
 
@@ -35,18 +46,32 @@ class PublicPageCollector(ABC):
         except httpx.HTTPError:
             return False
 
-    async def fetch(self, keyword: str) -> list[RawItem]:
+    async def fetch(self, keyword: str) -> tuple[list[RawItem], FetchStats]:
+        """Fetch items for *keyword*. Always returns (items, stats), never raises."""
         url = self.search_url(keyword)
-        if not await self.allowed_by_robots(url):
-            return []
+        try:
+            if not await self.allowed_by_robots(url):
+                return [], FetchStats(
+                    platform=self.config.name, keyword=keyword,
+                    success=False, robots_blocked=True, items_found=0,
+                )
 
-        settings = get_settings()
-        headers = {"User-Agent": settings.http_user_agent, "Accept-Language": "ja,en;q=0.8"}
-        async with httpx.AsyncClient(timeout=settings.http_timeout_seconds, follow_redirects=True) as client:
-            response = await client.get(url, headers=headers)
-            response.raise_for_status()
-        soup = BeautifulSoup(response.text, "html.parser")
-        return self.parse(keyword, soup, url)
+            settings = get_settings()
+            headers = {"User-Agent": settings.http_user_agent, "Accept-Language": "ja,en;q=0.8"}
+            async with httpx.AsyncClient(timeout=settings.http_timeout_seconds, follow_redirects=True) as client:
+                response = await client.get(url, headers=headers)
+                response.raise_for_status()
+            soup = BeautifulSoup(response.text, "html.parser")
+            items = self.parse(keyword, soup, url)
+            return items, FetchStats(
+                platform=self.config.name, keyword=keyword,
+                success=True, robots_blocked=False, items_found=len(items),
+            )
+        except Exception as exc:
+            return [], FetchStats(
+                platform=self.config.name, keyword=keyword,
+                success=False, robots_blocked=False, items_found=0, error=str(exc),
+            )
 
     @abstractmethod
     def parse(self, keyword: str, soup: BeautifulSoup, source_url: str) -> list[RawItem]:
@@ -60,4 +85,3 @@ def parse_price_yen(text: str) -> int:
 
 def now_utc() -> datetime:
     return datetime.now(timezone.utc)
-

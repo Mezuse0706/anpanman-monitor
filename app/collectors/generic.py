@@ -1,18 +1,115 @@
+import json
+
 from bs4 import BeautifulSoup
 
 from app.collectors.base import PlatformConfig, PublicPageCollector, now_utc, parse_price_yen
 from app.schemas import RawItem
 
 
+def _extract_json_ld_items(soup: BeautifulSoup, keyword: str, platform: str) -> list[RawItem]:
+    """Extract items from JSON-LD script[type='application/ld+json'] blocks."""
+    items: list[RawItem] = []
+    for script in soup.select("script[type='application/ld+json']"):
+        if not script.string:
+            continue
+        try:
+            data = json.loads(script.string)
+        except json.JSONDecodeError:
+            continue
+
+        entries: list[dict] = []
+        if isinstance(data, list):
+            entries = data
+        elif isinstance(data, dict):
+            if "@graph" in data and isinstance(data["@graph"], list):
+                entries = data["@graph"]
+            else:
+                entries = [data]
+
+        for entry in entries:
+            if not isinstance(entry, dict) or entry.get("@type") not in ("Product",):
+                continue
+            name = entry.get("name", "").strip()
+            if not name:
+                continue
+
+            offers = entry.get("offers", {})
+            if isinstance(offers, dict):
+                price_str = str(offers.get("price", "0")).replace(",", "")
+                currency = offers.get("priceCurrency", "")
+            elif isinstance(offers, list) and offers:
+                price_str = str(offers[0].get("price", "0")).replace(",", "")
+                currency = offers[0].get("priceCurrency", "")
+            else:
+                price_str = "0"
+                currency = ""
+
+            if currency and currency not in ("JPY", "JP", ""):
+                continue
+
+            price = parse_price_yen(price_str)
+            if price <= 0:
+                continue
+
+            image = ""
+            img_data = entry.get("image", "")
+            if isinstance(img_data, str):
+                image = img_data
+            elif isinstance(img_data, dict):
+                image = img_data.get("url", "")
+
+            url = entry.get("url", "")
+            if not url:
+                continue
+
+            items.append(RawItem(
+                platform=platform,
+                keyword=keyword,
+                title=name,
+                price_yen=price,
+                shipping_fee=0,
+                publish_time=now_utc(),
+                seller="",
+                image_url=image,
+                product_url=url,
+            ))
+    return items
+
+
 class GenericCardCollector(PublicPageCollector):
-    card_selectors = ("article", "[data-testid*=item]", ".item", ".Product", ".product")
-    title_selectors = ("h2", "h3", "[data-testid*=title]", ".title", ".Product__title")
-    price_selectors = ("[data-testid*=price]", ".price", ".Product__price")
+    card_selectors = (
+        "article", "[data-testid*=item]", ".item", ".Product", ".product",
+        ".s-result-item",            # Amazon
+        ".searchresultitem",         # Rakuten
+        ".items-box",               # Rakuma fallback
+    )
+    title_selectors = (
+        "h2", "h3", "[data-testid*=title]", ".title", ".Product__title",
+        ".item-name", ".items-box-name",
+        "h2 a.a-text-normal",       # Amazon
+        ".product-name",
+    )
+    price_selectors = (
+        "[data-testid*=price]", ".price", ".Product__price", ".item-price",
+        ".a-price-whole",           # Amazon
+        ".important-price",         # Rakuten
+        ".items-box-price",         # Rakuma
+        ".price-value",
+    )
     image_selectors = ("img",)
     link_selectors = ("a[href]",)
 
     def parse(self, keyword: str, soup: BeautifulSoup, source_url: str) -> list[RawItem]:
         items: list[RawItem] = []
+
+        # First pass: JSON-LD structured data (Product + Offer)
+        try:
+            ld_items = _extract_json_ld_items(soup, keyword, self.config.name)
+            items.extend(ld_items)
+        except Exception:
+            pass
+
+        # Second pass: HTML card / selector-based extraction
         cards = []
         for selector in self.card_selectors:
             cards = soup.select(selector)

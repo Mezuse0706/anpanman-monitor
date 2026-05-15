@@ -14,6 +14,8 @@ from app.db import SessionLocal, get_db, init_db
 from app.models import Item, Keyword
 from app.monitor import run_monitor_once
 from app.schemas import ItemOut, KeywordCreate, KeywordImport, KeywordOut, ProfitInput, ProfitOutput
+from sqlalchemy import func as sqlfunc
+
 from app.services.history import price_stats, sku_from_title
 from app.services.notifications import send_feishu_test_message
 from app.services.profit import calculate_profit
@@ -115,6 +117,30 @@ def page_shell(content: str) -> str:
 </html>"""
 
 
+PLATFORM_LABELS: dict[str, str] = {
+    "mercari_japan": "Mercari",
+    "yahoo_auctions_japan": "Yahoo Auctions",
+    "rakuma": "Rakuma",
+    "rakuten_japan": "Rakuten",
+    "amazon_japan": "Amazon Japan",
+}
+
+
+def _platform_count_rows(db: Session) -> str:
+    """Build HTML rows showing how many items exist per platform in the DB."""
+    rows: list[str] = []
+    counts: dict[str, int] = dict(
+        db.query(Item.platform, sqlfunc.count(Item.id)).group_by(Item.platform).all()
+    )
+    # Show all known platforms, even those with 0 items
+    for key, label in PLATFORM_LABELS.items():
+        cnt = counts.get(key, 0)
+        rows.append(f'<span class="tag">{label}: <strong>{cnt}</strong></span>')
+    if not rows:
+        return '<p class="muted">暂无数据。</p>'
+    return '<div class="keywords">' + "".join(rows) + "</div>"
+
+
 @app.get("/", response_class=HTMLResponse)
 def dashboard(db: Session = Depends(get_db)) -> HTMLResponse:
     settings = get_settings()
@@ -125,6 +151,7 @@ def dashboard(db: Session = Depends(get_db)) -> HTMLResponse:
         f'<span class="tag">{escape(k.group_name)} / {escape(k.text)}</span>' for k in keywords
     )
     item_cards = "".join(render_item(item) for item in items) or '<div class="panel muted">还没有商品。点击“立即监控一次”开始抓取。</div>'
+    platform_rows = _platform_count_rows(db)
 
     content = f"""
 <div class="grid">
@@ -136,6 +163,10 @@ def dashboard(db: Session = Depends(get_db)) -> HTMLResponse:
         <form method="post" action="/web/monitor/run-once"><button type="submit">立即监控一次</button></form>
         <form method="post" action="/web/alerts/test"><button class="secondary" type="submit">测试飞书提醒</button></form>
       </div>
+    </div>
+    <div class="panel">
+      <h2>各平台数据库存量</h2>
+      {platform_rows}
     </div>
     <div class="panel">
       <h2>新增关键词</h2>
@@ -161,7 +192,12 @@ def dashboard(db: Session = Depends(get_db)) -> HTMLResponse:
   <section class="stack">
     <div class="panel">
       <h2>实时新货</h2>
-      <p class="muted">A 级商品会推送到飞书。列表按抓取时间倒序。</p>
+      <p class="muted">
+        <strong>A级</strong>（高稀缺，推送飞书）：<span style="color:#dc2626;">红色左边框</span> — 近期发布 + 低于均价30%以上 + 含稀有词<br>
+        <strong>B级</strong>（中稀缺）：<span style="color:#f59e0b;">橙色左边框</span> — 近期发布 + 低于均价15%以上<br>
+        <strong>C级</strong>（普通）：<span style="color:#9ca3af;">灰色左边框</span> — 常规商品<br>
+        <strong>分数</strong>：右侧数字（1–100），越高越稀缺。
+      </p>
     </div>
     <div class="items">{item_cards}</div>
   </section>
@@ -326,7 +362,8 @@ def item_history(item_id: int, db: Session = Depends(get_db)) -> dict[str, float
 
 
 @app.post("/monitor/run-once")
-def monitor_once(db: Session = Depends(get_db)) -> dict[str, int]:
+def monitor_once(db: Session = Depends(get_db)) -> dict:
+    """Run one monitor cycle. Returns ingest counts plus per-platform fetch stats."""
     return asyncio.run(run_monitor_once(db))
 
 

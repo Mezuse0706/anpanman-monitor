@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.collectors.base import FetchStats
 from app.collectors.generic import (
     AmazonJapanCollector,
     MercariCollector,
@@ -29,18 +30,63 @@ COLLECTORS = [
 ]
 
 
-async def collect_for_keywords(keywords: Iterable[Keyword]) -> list[RawItem]:
+async def collect_for_keywords(keywords: Iterable[Keyword]) -> tuple[list[RawItem], list[FetchStats]]:
+    """Fetch items for every (keyword, collector) pair and return (items, per-fetch stats)."""
     tasks = []
     for keyword in keywords:
         for collector in COLLECTORS:
             tasks.append(collector.fetch(keyword.text))
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    results = await asyncio.gather(*tasks)
     raw_items: list[RawItem] = []
+    all_stats: list[FetchStats] = []
+
     for result in results:
+        # fetch() always returns tuple[list[RawItem], FetchStats] — never raises
         if isinstance(result, Exception):
             continue
-        raw_items.extend(result)
-    return raw_items
+        if isinstance(result, tuple) and len(result) == 2:
+            items, stats = result
+            raw_items.extend(items)
+            all_stats.append(stats)
+        elif isinstance(result, list):  # legacy safety
+            raw_items.extend(result)
+
+    return raw_items, all_stats
+
+
+def aggregate_fetch_stats(stats: list[FetchStats]) -> dict:
+    """Aggregate per-fetch stats into a human-readable summary per platform."""
+    by_platform: dict[str, dict] = {}
+    for s in stats:
+        p = s.platform
+        if p not in by_platform:
+            by_platform[p] = {
+                "attempts": 0,
+                "successes": 0,
+                "robots_blocked": 0,
+                "errors": 0,
+                "total_items_found": 0,
+                "keywords_attempted": [],
+                "error_details": [],
+            }
+        by_platform[p]["attempts"] += 1
+        if s.success:
+            by_platform[p]["successes"] += 1
+        if s.robots_blocked:
+            by_platform[p]["robots_blocked"] += 1
+        if s.error:
+            by_platform[p]["errors"] += 1
+            by_platform[p]["error_details"].append(f"[{s.keyword}] {s.error}")
+        by_platform[p]["total_items_found"] += s.items_found
+        by_platform[p]["keywords_attempted"].append(s.keyword)
+
+    # Clean up: deduplicate keyword lists, limit error details
+    for p in by_platform:
+        by_platform[p]["keywords_attempted"] = sorted(set(by_platform[p]["keywords_attempted"]))
+        by_platform[p]["error_details"] = by_platform[p]["error_details"][:3]
+
+    return by_platform
 
 
 async def ingest_items(db: Session, raw_items: Iterable[RawItem]) -> dict[str, int]:
@@ -90,7 +136,12 @@ async def ingest_items(db: Session, raw_items: Iterable[RawItem]) -> dict[str, i
     return {"created": created, "skipped": skipped, "alerted": alerted}
 
 
-async def run_monitor_once(db: Session) -> dict[str, int]:
+async def run_monitor_once(db: Session) -> dict:
+    """Run one full monitor cycle and return ingest + fetch statistics."""
     keywords = db.query(Keyword).all()
-    raw_items = await collect_for_keywords(keywords)
-    return await ingest_items(db, raw_items)
+    raw_items, fetch_stats = await collect_for_keywords(keywords)
+    ingest_result = await ingest_items(db, raw_items)
+    return {
+        **ingest_result,
+        "fetch_stats": aggregate_fetch_stats(fetch_stats),
+    }
