@@ -13,6 +13,7 @@ from app.services.dedupe import build_dedupe_key
 from app.services.profit import calculate_profit
 from app.services.proxy import proxy_support
 from app.services.scoring import HIGH_VALUE_TERMS, RARE_TERMS, _age_minutes, score_item
+from app.services.settings import feishu_alerts_enabled, set_feishu_alerts_enabled
 
 
 # ── dedupe ──────────────────────────────────────────────────────────────
@@ -57,6 +58,27 @@ def test_proxy_support_marks_amazon_as_direct_purchase() -> None:
     assert buyee_supported is False
     assert zen_supported is False
     assert "Amazon" in note
+
+
+def test_feishu_alert_setting_toggle() -> None:
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session, sessionmaker
+
+    from app.db import Base
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(bind=engine)
+    session_factory = sessionmaker(bind=engine)
+
+    db: Session = session_factory()
+    try:
+        assert feishu_alerts_enabled(db) is True
+        set_feishu_alerts_enabled(db, False)
+        assert feishu_alerts_enabled(db) is False
+        set_feishu_alerts_enabled(db, True)
+        assert feishu_alerts_enabled(db) is True
+    finally:
+        db.close()
 
 
 # ── scoring helpers ────────────────────────────────────────────────────

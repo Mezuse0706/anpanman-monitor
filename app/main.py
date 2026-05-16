@@ -21,6 +21,7 @@ from app.services.history import price_stats, sku_from_title
 from app.services.notifications import send_feishu_test_message
 from app.services.profit import calculate_profit
 from app.services.proxy import proxy_support
+from app.services.settings import feishu_alerts_enabled, set_feishu_alerts_enabled
 
 DEFAULT_KEYWORDS = [
     "アンパンマン",
@@ -54,6 +55,7 @@ def cleanup_known_bad_prices(db: Session) -> None:
 
 async def monitor_loop() -> None:
     settings = get_settings()
+    alerts_enabled = feishu_alerts_enabled(db)
     while True:
         await asyncio.sleep(settings.monitor_interval_seconds)
         db = SessionLocal()
@@ -196,8 +198,11 @@ def dashboard(
   <section class="stack">
     <div class="panel">
       <h2>控制台</h2>
-      <p class="muted">飞书：{feishu_status}；后台轮询：每 {settings.monitor_interval_seconds} 秒；价格保留原始币种，并约算人民币/日元。</p>
+      <p class="muted">飞书：{feishu_status}；推送：{"开启" if alerts_enabled else "暂停"}；后台轮询：每 {settings.monitor_interval_seconds} 秒；价格保留原始币种，并约算人民币/日元。</p>
       <div class="row">
+        <form method="post" action="/web/alerts/toggle">
+          <button class="{"secondary" if alerts_enabled else ""}" type="submit">{"暂停飞书推送" if alerts_enabled else "开启飞书推送"}</button>
+        </form>
         <form method="post" action="/web/monitor/run-once"><button type="submit">立即监控一次</button></form>
         <form method="post" action="/web/alerts/test"><button class="secondary" type="submit">测试飞书提醒</button></form>
       </div>
@@ -366,6 +371,12 @@ def web_monitor_once(db: Session = Depends(get_db)) -> RedirectResponse:
 @app.post("/web/alerts/test")
 def web_test_alert() -> RedirectResponse:
     asyncio.run(send_feishu_test_message())
+    return RedirectResponse("/", status_code=303)
+
+
+@app.post("/web/alerts/toggle")
+def web_toggle_alerts(db: Session = Depends(get_db)) -> RedirectResponse:
+    set_feishu_alerts_enabled(db, not feishu_alerts_enabled(db))
     return RedirectResponse("/", status_code=303)
 
 

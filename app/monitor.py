@@ -19,6 +19,7 @@ from app.services.history import record_price, sku_from_title
 from app.services.notifications import send_feishu_alert
 from app.services.proxy import buyee_url, zenmarket_url
 from app.services.scoring import score_item
+from app.services.settings import feishu_alerts_enabled
 
 
 COLLECTORS = [
@@ -131,7 +132,7 @@ async def ingest_items(db: Session, raw_items: Iterable[RawItem]) -> dict[str, i
             skipped += 1
             continue
 
-        if level == AlertLevel.A:
+        if level == AlertLevel.A and feishu_alerts_enabled(db):
             if await send_feishu_alert(item):
                 alerted += 1
 
