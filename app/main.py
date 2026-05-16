@@ -38,10 +38,12 @@ DEFAULT_KEYWORDS = [
 
 
 def seed_default_keywords(db: Session) -> None:
-    if db.query(Keyword).count() > 0:
-        return
+    db.query(Keyword).filter(Keyword.text.like("%ã%")).delete(synchronize_session=False)
+    db.query(Keyword).filter(Keyword.text.like("%�%")).delete(synchronize_session=False)
+    existing_texts = {row[0] for row in db.query(Keyword.text).all()}
     for text in DEFAULT_KEYWORDS:
-        db.add(Keyword(text=text, group_name="anpanman"))
+        if text not in existing_texts:
+            db.add(Keyword(text=text, group_name="anpanman"))
     db.commit()
 
 
