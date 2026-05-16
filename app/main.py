@@ -155,6 +155,7 @@ def _platform_count_rows(db: Session) -> str:
 def dashboard(
     page: int = Query(1, ge=1),
     platform: str = Query("all"),
+    level: str = Query("all"),
     db: Session = Depends(get_db),
 ) -> HTMLResponse:
     settings = get_settings()
@@ -163,18 +164,32 @@ def dashboard(
     item_query = db.query(Item)
     if platform != "all":
         item_query = item_query.filter(Item.platform == platform)
+    if level in {"A", "B", "C"}:
+        item_query = item_query.filter(Item.alert_level == level)
     total_items = item_query.count()
     total_pages = max((total_items + page_size - 1) // page_size, 1)
     page = min(page, total_pages)
-    items = item_query.order_by(desc(Item.fetch_time)).offset((page - 1) * page_size).limit(page_size).all()
+    level_rank = sqlfunc.case(
+        (Item.alert_level == "A", 3),
+        (Item.alert_level == "B", 2),
+        (Item.alert_level == "C", 1),
+        else_=0,
+    )
+    items = (
+        item_query.order_by(desc(level_rank), desc(Item.scarcity_score), desc(Item.fetch_time))
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
     feishu_status = "已配置" if settings.feishu_webhook_url else "未配置"
     keyword_tags = "".join(
         f'<span class="tag">{escape(k.group_name)} / {escape(k.text)}</span>' for k in keywords
     )
     item_cards = "".join(render_item(item) for item in items) or '<div class="panel muted">还没有商品。点击“立即监控一次”开始抓取。</div>'
     platform_rows = _platform_count_rows(db)
-    platform_filter = render_platform_filter(platform)
-    pager = render_pager(page, total_pages, total_items, platform)
+    platform_filter = render_platform_filter(platform, level)
+    level_filter = render_level_filter(platform, level)
+    pager = render_pager(page, total_pages, total_items, platform, level)
 
     content = f"""
 <div class="grid">
@@ -216,6 +231,7 @@ def dashboard(
     <div class="panel">
       <h2>实时新货</h2>
       {platform_filter}
+      {level_filter}
       <p class="muted">
         <strong>A级</strong>（高稀缺，推送飞书）：<span style="color:#dc2626;">红色左边框</span> — 近期发布 + 低于均价30%以上 + 含稀有词<br>
         <strong>B级</strong>（中稀缺）：<span style="color:#f59e0b;">橙色左边框</span> — 近期发布 + 低于均价15%以上<br>
@@ -232,16 +248,25 @@ def dashboard(
     return HTMLResponse(page_shell(content))
 
 
-def render_platform_filter(selected: str) -> str:
+def render_platform_filter(selected: str, level: str) -> str:
     options = [('all', '全部平台')] + list(PLATFORM_LABELS.items())
     links = []
     for value, label in options:
         style = 'background:#2563eb;color:white;' if value == selected else ''
-        links.append(f'<a class="tag" style="{style}" href="/?platform={escape(value)}&page=1">{escape(label)}</a>')
+        links.append(f'<a class="tag" style="{style}" href="/?platform={escape(value)}&level={escape(level)}&page=1">{escape(label)}</a>')
     return '<div class="keywords" style="margin-bottom:10px;">' + ''.join(links) + '</div>'
 
 
-def render_pager(page: int, total_pages: int, total_items: int, platform: str) -> str:
+def render_level_filter(platform: str, selected: str) -> str:
+    options = [("all", "全部评级"), ("A", "A级优先"), ("B", "B级"), ("C", "C级")]
+    links = []
+    for value, label in options:
+        style = 'background:#2563eb;color:white;' if value == selected else ''
+        links.append(f'<a class="tag" style="{style}" href="/?platform={escape(platform)}&level={value}&page=1">{label}</a>')
+    return '<div class="keywords" style="margin-bottom:10px;">' + ''.join(links) + '</div>'
+
+
+def render_pager(page: int, total_pages: int, total_items: int, platform: str, level: str) -> str:
     prev_page = max(page - 1, 1)
     next_page = min(page + 1, total_pages)
     prev_disabled = 'style="pointer-events:none;opacity:.45;"' if page <= 1 else ''
@@ -250,8 +275,8 @@ def render_pager(page: int, total_pages: int, total_items: int, platform: str) -
 <div class="row muted" style="justify-content:space-between;margin-top:10px;">
   <span>共 {total_items} 条，第 {page} / {total_pages} 页，每页 25 条。</span>
   <span class="row">
-    <a class="button secondary" {prev_disabled} href="/?platform={escape(platform)}&page={prev_page}">上一页</a>
-    <a class="button secondary" {next_disabled} href="/?platform={escape(platform)}&page={next_page}">下一页</a>
+    <a class="button secondary" {prev_disabled} href="/?platform={escape(platform)}&level={escape(level)}&page={prev_page}">上一页</a>
+    <a class="button secondary" {next_disabled} href="/?platform={escape(platform)}&level={escape(level)}&page={next_page}">下一页</a>
   </span>
 </div>"""
 
