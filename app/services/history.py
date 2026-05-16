@@ -4,10 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import HistoricalPrice
-
-
-def sku_from_title(title: str) -> str:
-    return " ".join(title.lower().split())[:200]
+from app.services.catalog import sku_from_title
 
 
 def record_price(db: Session, sku: str, platform: str, price: int, date: datetime | None = None) -> None:
@@ -34,4 +31,3 @@ def price_stats(db: Session, sku: str) -> dict[str, float | int | None]:
         "max": int(max_price) if max_price else None,
         "trend_30d_average": round(float(trend_30d), 2) if trend_30d else None,
     }
-

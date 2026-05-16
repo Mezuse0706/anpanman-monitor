@@ -17,6 +17,7 @@ from app.schemas import ItemOut, KeywordCreate, KeywordImport, KeywordOut, Profi
 from sqlalchemy import func as sqlfunc
 
 from app.services.currency import format_price
+from app.services.catalog import identify_category
 from app.services.history import price_stats, sku_from_title
 from app.services.notifications import send_feishu_test_message
 from app.services.profit import calculate_profit
@@ -327,6 +328,7 @@ def render_item(item: Item) -> str:
   </div>
   <div class="meta muted">
     <span>{escape(item.platform)}</span>
+    <span>品类：{escape(identify_category(item.title))}</span>
     <span>{escape(format_price(item.original_price, item.original_currency, item.price_yen))}</span>
     <span>{escape(item.keyword)}</span>
     <span>毛利：<span class="{margin_class}">{margin}</span></span>

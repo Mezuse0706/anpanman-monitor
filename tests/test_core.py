@@ -9,6 +9,7 @@ from app.collectors.generic import _extract_json_ld_items
 from app.monitor import aggregate_fetch_stats
 from app.schemas import ProfitInput, RawItem
 from app.services.currency import format_price, format_yen_cny, hkd_to_cny, hkd_to_yen, yen_to_cny
+from app.services.catalog import identify_category, normalize_title_for_sku, sku_from_title
 from app.services.dedupe import build_dedupe_key
 from app.services.profit import calculate_profit
 from app.services.proxy import proxy_support
@@ -79,6 +80,15 @@ def test_feishu_alert_setting_toggle() -> None:
         assert feishu_alerts_enabled(db) is True
     finally:
         db.close()
+
+
+def test_catalog_category_and_sku_normalization() -> None:
+    title = "【美品】アンパンマン 三輪車 バンダイ 送料無料"
+    assert identify_category(title) == "三輪車"
+    normalized = normalize_title_for_sku(title)
+    assert "美品" not in normalized
+    assert "送料無料" not in normalized
+    assert sku_from_title(title).startswith("三輪車:")
 
 
 # ── scoring helpers ────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import AlertLevel, HistoricalPrice
+from app.services.catalog import identify_category
 from app.services.history import sku_from_title
 
 RARE_TERMS = ("美品", "未使用", "限定", "廃盤", "レア")
@@ -47,7 +48,10 @@ def score_item(
     age = _age_minutes(publish_time)
     rare_hits = sum(1 for term in RARE_TERMS if term in title)
     has_strong_rare_term = any(term in title for term in STRONG_RARE_TERMS)
-    has_high_value_term = any(term in title for term in HIGH_VALUE_TERMS)
+    category = identify_category(title)
+    has_high_value_term = category in {"三輪車", "乗用玩具", "ベビーカー", "ジャングルジム"} or any(
+        term in title for term in HIGH_VALUE_TERMS
+    )
     has_risk_term = any(term in title for term in RISK_TERMS)
 
     score = 20
