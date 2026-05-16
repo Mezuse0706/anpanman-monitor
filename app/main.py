@@ -184,6 +184,7 @@ def dashboard(
         .all()
     )
     feishu_status = "已配置" if settings.feishu_webhook_url else "未配置"
+    alerts_enabled = feishu_alerts_enabled(db)
     keyword_tags = "".join(
         f'<span class="tag">{escape(k.group_name)} / {escape(k.text)}</span>' for k in keywords
     )
