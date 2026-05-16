@@ -212,6 +212,7 @@ def dashboard(
       </div>
       <form class="toggle-form" method="post" action="/web/alerts/toggle">
         <button class="toggle-button" type="submit" title="打开或暂停飞书 A级提醒推送">
+          <span>飞书推送</span>
           <span>{"开" if alerts_enabled else "关"}</span>
           <span class="switch {"on" if alerts_enabled else ""}"><span class="knob"></span></span>
         </button>
