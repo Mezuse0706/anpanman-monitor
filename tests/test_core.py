@@ -11,6 +11,7 @@ from app.schemas import ProfitInput, RawItem
 from app.services.currency import format_price, format_yen_cny, hkd_to_cny, hkd_to_yen, yen_to_cny
 from app.services.dedupe import build_dedupe_key
 from app.services.profit import calculate_profit
+from app.services.proxy import proxy_support
 from app.services.scoring import RARE_TERMS, _age_minutes, score_item
 
 
@@ -49,6 +50,13 @@ def test_currency_format_uses_jpy_and_cny() -> None:
     assert hkd_to_cny(55.93) == 51.46
     assert hkd_to_yen(55.93) == 1072
     assert format_price(55.93, "HKD", 1072) == "HKD 55.93 / 约 RMB 51.46 / 折合 JPY 1,072"
+
+
+def test_proxy_support_marks_amazon_as_direct_purchase() -> None:
+    buyee_supported, zen_supported, note = proxy_support("amazon_japan")
+    assert buyee_supported is False
+    assert zen_supported is False
+    assert "Amazon" in note
 
 
 # ── scoring helpers ────────────────────────────────────────────────────

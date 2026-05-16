@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from html import escape
 from urllib.parse import quote_plus
 
-from fastapi import Depends, FastAPI, Form, HTTPException
+from fastapi import Depends, FastAPI, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import desc
 from sqlalchemy.exc import IntegrityError
@@ -20,6 +20,7 @@ from app.services.currency import format_price
 from app.services.history import price_stats, sku_from_title
 from app.services.notifications import send_feishu_test_message
 from app.services.profit import calculate_profit
+from app.services.proxy import proxy_support
 
 DEFAULT_KEYWORDS = [
     "アンパンマン",
@@ -149,16 +150,29 @@ def _platform_count_rows(db: Session) -> str:
 
 
 @app.get("/", response_class=HTMLResponse)
-def dashboard(db: Session = Depends(get_db)) -> HTMLResponse:
+def dashboard(
+    page: int = Query(1, ge=1),
+    platform: str = Query("all"),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
     settings = get_settings()
     keywords = db.query(Keyword).order_by(Keyword.group_name, Keyword.text).all()
-    items = db.query(Item).order_by(desc(Item.fetch_time)).limit(50).all()
+    page_size = 25
+    item_query = db.query(Item)
+    if platform != "all":
+        item_query = item_query.filter(Item.platform == platform)
+    total_items = item_query.count()
+    total_pages = max((total_items + page_size - 1) // page_size, 1)
+    page = min(page, total_pages)
+    items = item_query.order_by(desc(Item.fetch_time)).offset((page - 1) * page_size).limit(page_size).all()
     feishu_status = "已配置" if settings.feishu_webhook_url else "未配置"
     keyword_tags = "".join(
         f'<span class="tag">{escape(k.group_name)} / {escape(k.text)}</span>' for k in keywords
     )
     item_cards = "".join(render_item(item) for item in items) or '<div class="panel muted">还没有商品。点击“立即监控一次”开始抓取。</div>'
     platform_rows = _platform_count_rows(db)
+    platform_filter = render_platform_filter(platform)
+    pager = render_pager(page, total_pages, total_items, platform)
 
     content = f"""
 <div class="grid">
@@ -199,24 +213,60 @@ def dashboard(db: Session = Depends(get_db)) -> HTMLResponse:
   <section class="stack">
     <div class="panel">
       <h2>实时新货</h2>
+      {platform_filter}
       <p class="muted">
         <strong>A级</strong>（高稀缺，推送飞书）：<span style="color:#dc2626;">红色左边框</span> — 近期发布 + 低于均价30%以上 + 含稀有词<br>
         <strong>B级</strong>（中稀缺）：<span style="color:#f59e0b;">橙色左边框</span> — 近期发布 + 低于均价15%以上<br>
         <strong>C级</strong>（普通）：<span style="color:#9ca3af;">灰色左边框</span> — 常规商品<br>
         <strong>分数</strong>：右侧数字（1–100），越高越稀缺。
       </p>
+      {pager}
     </div>
     <div class="items">{item_cards}</div>
+    {pager}
   </section>
 </div>
 """
     return HTMLResponse(page_shell(content))
 
 
+def render_platform_filter(selected: str) -> str:
+    options = [('all', '全部平台')] + list(PLATFORM_LABELS.items())
+    links = []
+    for value, label in options:
+        style = 'background:#2563eb;color:white;' if value == selected else ''
+        links.append(f'<a class="tag" style="{style}" href="/?platform={escape(value)}&page=1">{escape(label)}</a>')
+    return '<div class="keywords" style="margin-bottom:10px;">' + ''.join(links) + '</div>'
+
+
+def render_pager(page: int, total_pages: int, total_items: int, platform: str) -> str:
+    prev_page = max(page - 1, 1)
+    next_page = min(page + 1, total_pages)
+    prev_disabled = 'style="pointer-events:none;opacity:.45;"' if page <= 1 else ''
+    next_disabled = 'style="pointer-events:none;opacity:.45;"' if page >= total_pages else ''
+    return f"""
+<div class="row muted" style="justify-content:space-between;margin-top:10px;">
+  <span>共 {total_items} 条，第 {page} / {total_pages} 页，每页 25 条。</span>
+  <span class="row">
+    <a class="button secondary" {prev_disabled} href="/?platform={escape(platform)}&page={prev_page}">上一页</a>
+    <a class="button secondary" {next_disabled} href="/?platform={escape(platform)}&page={next_page}">下一页</a>
+  </span>
+</div>"""
+
+
 def render_item(item: Item) -> str:
     margin_class = "danger" if item.gross_margin_percent is not None and item.gross_margin_percent < 30 else ""
     margin = "未计算" if item.gross_margin_percent is None else f"{item.gross_margin_percent:.2f}%"
     image = f'<img src="{escape(item.image_url)}" alt="" style="max-width:120px;border-radius:6px;">' if item.image_url else ""
+    buyee_supported, zen_supported, proxy_note = proxy_support(item.platform)
+    buyee_button = (
+        f'<a class="button secondary" href="{escape(item.buyee_url)}" target="_blank" rel="noreferrer">Buyee搜索</a>'
+        if buyee_supported else '<span class="tag">Buyee不适用</span>'
+    )
+    zen_button = (
+        f'<a class="button secondary" href="{escape(item.zenmarket_url)}" target="_blank" rel="noreferrer">ZenMarket搜索</a>'
+        if zen_supported else '<span class="tag">ZenMarket不适用</span>'
+    )
     return f"""
 <article class="item level-{escape(item.alert_level)}">
   <div class="row" style="justify-content:space-between;">
@@ -232,9 +282,10 @@ def render_item(item: Item) -> str:
   {image}
   <div class="row" style="margin-top:10px;">
     <a class="button" href="{escape(item.product_url)}" target="_blank" rel="noreferrer">商品链接</a>
-    <a class="button secondary" href="{escape(item.buyee_url)}" target="_blank" rel="noreferrer">Buy via Buyee</a>
-    <a class="button secondary" href="{escape(item.zenmarket_url)}" target="_blank" rel="noreferrer">Buy via ZenMarket</a>
+    {buyee_button}
+    {zen_button}
   </div>
+  <p class="muted">{escape(proxy_note)}</p>
 </article>"""
 
 
