@@ -97,7 +97,7 @@ async def ingest_items(db: Session, raw_items: Iterable[RawItem]) -> dict[str, i
     for raw in raw_items:
         image_hash = image_hash_from_url(raw.image_url)
         dedupe_key = build_dedupe_key(raw.title, raw.seller, image_hash, raw.price_yen)
-        score, level = score_item(db, raw.title, raw.price_yen, raw.publish_time)
+        score, level = score_item(db, raw.title, raw.price_yen, raw.publish_time, raw.platform)
         product_url = str(raw.product_url)
         item = Item(
             platform=raw.platform,

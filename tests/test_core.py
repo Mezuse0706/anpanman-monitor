@@ -12,7 +12,7 @@ from app.services.currency import format_price, format_yen_cny, hkd_to_cny, hkd_
 from app.services.dedupe import build_dedupe_key
 from app.services.profit import calculate_profit
 from app.services.proxy import proxy_support
-from app.services.scoring import RARE_TERMS, _age_minutes, score_item
+from app.services.scoring import HIGH_VALUE_TERMS, RARE_TERMS, _age_minutes, score_item
 
 
 # ── dedupe ──────────────────────────────────────────────────────────────
@@ -68,8 +68,13 @@ def test_age_minutes_handles_timezone() -> None:
 
 
 def test_rare_terms_include_required_words() -> None:
-    for term in ("美品", "未使用", "限定", "廃盤"):
+    for term in ("美品", "未使用", "限定", "廃盤", "レア"):
         assert term in RARE_TERMS
+
+
+def test_high_value_terms_include_core_categories() -> None:
+    for term in ("三輪車", "乗用", "ベビーカー", "キッズカー"):
+        assert term in HIGH_VALUE_TERMS
 
 
 def test_score_item_no_history_returns_c() -> None:
@@ -85,8 +90,14 @@ def test_score_item_no_history_returns_c() -> None:
 
     db: Session = session_factory()
     try:
-        score, level = score_item(db, "アンパンマン 美品 未使用", 2000, datetime.now(timezone.utc))
-        assert level.value == "C" or level.value == "A"  # rare terms + young age can push to A
+        score, level = score_item(
+            db,
+            "アンパンマン 美品 未使用 キッズカー",
+            2000,
+            datetime.now(timezone.utc),
+            "yahoo_auctions_japan",
+        )
+        assert level.value in {"A", "B"}
         assert 1 <= score <= 100
     finally:
         db.close()
@@ -117,6 +128,31 @@ def test_score_item_old_and_expensive_is_c() -> None:
             datetime.now(timezone.utc) - timedelta(days=10),  # old
         )
         assert level == level  # just assert it doesn't crash
+        assert 1 <= score <= 100
+    finally:
+        db.close()
+
+
+def test_score_item_risk_term_prevents_a_level() -> None:
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session, sessionmaker
+
+    from app.db import Base
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False})
+    Base.metadata.create_all(bind=engine)
+    session_factory = sessionmaker(bind=engine)
+
+    db: Session = session_factory()
+    try:
+        score, level = score_item(
+            db,
+            "アンパンマン 限定 キッズカー ジャンク",
+            1500,
+            datetime.now(timezone.utc),
+            "yahoo_auctions_japan",
+        )
+        assert level.value != "A"
         assert 1 <= score <= 100
     finally:
         db.close()

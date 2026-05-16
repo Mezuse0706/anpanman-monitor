@@ -207,6 +207,15 @@ def dashboard(
       {platform_rows}
     </div>
     <div class="panel">
+      <h2>评分规则</h2>
+      <p class="muted">
+        A级：80分以上，且命中强稀缺词、低价高价值品类，或可靠历史均价显示明显低价。<br>
+        B级：60分以上，或低价高价值品类，或新发布且带稀缺词。<br>
+        C级：普通新货。分数来自发布时间、稀缺词、品类价值、价格区间、平台、历史均价和风险词。<br>
+        历史均价只有同 SKU 样本达到 5 条后才参与评分；当前早期阶段更看重“早发现”和候选信号。
+      </p>
+    </div>
+    <div class="panel">
       <h2>新增关键词</h2>
       <form method="post" action="/web/keywords" class="stack">
         <input name="text" placeholder="例如：アンパンマン 廃盤" required>
