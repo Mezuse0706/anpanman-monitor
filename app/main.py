@@ -119,7 +119,7 @@ def page_shell(content: str) -> str:
     .level-A {{ border-left: 5px solid #dc2626; }}
     .level-B {{ border-left: 5px solid #f59e0b; }}
     .level-C {{ border-left: 5px solid #9ca3af; }}
-    .toggle-form {{ display: flex; justify-content: center; margin-top: 12px; }}
+    .toggle-form {{ display: flex; justify-content: flex-start; margin-top: 12px; }}
     .toggle-button {{ display: inline-flex; gap: 10px; align-items: center; border: 0; background: transparent; color: #111827; cursor: pointer; font-size: 16px; padding: 0; }}
     .switch {{ width: 58px; height: 30px; border-radius: 999px; background: #9ca3af; position: relative; display: inline-block; }}
     .switch.on {{ background: #0875d1; }}
