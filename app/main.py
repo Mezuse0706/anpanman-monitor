@@ -119,6 +119,12 @@ def page_shell(content: str) -> str:
     .level-A {{ border-left: 5px solid #dc2626; }}
     .level-B {{ border-left: 5px solid #f59e0b; }}
     .level-C {{ border-left: 5px solid #9ca3af; }}
+    .toggle-form {{ display: flex; justify-content: center; margin-top: 12px; }}
+    .toggle-button {{ display: inline-flex; gap: 10px; align-items: center; border: 0; background: transparent; color: #111827; cursor: pointer; font-size: 16px; padding: 0; }}
+    .switch {{ width: 58px; height: 30px; border-radius: 999px; background: #9ca3af; position: relative; display: inline-block; }}
+    .switch.on {{ background: #0875d1; }}
+    .knob {{ width: 22px; height: 22px; border-radius: 50%; background: white; position: absolute; top: 4px; left: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.24); }}
+    .switch.on .knob {{ left: 32px; }}
     @media (max-width: 860px) {{ .grid {{ grid-template-columns: 1fr; }} main {{ padding: 16px; }} }}
   </style>
 </head>
@@ -199,14 +205,17 @@ def dashboard(
   <section class="stack">
     <div class="panel">
       <h2>控制台</h2>
-      <p class="muted">飞书：{feishu_status}；推送：{"开启" if alerts_enabled else "暂停"}；后台轮询：每 {settings.monitor_interval_seconds} 秒；价格保留原始币种，并约算人民币/日元。</p>
+      <p class="muted">飞书：{feishu_status}；后台轮询：每 {settings.monitor_interval_seconds} 秒；价格保留原始币种，并约算人民币/日元。</p>
       <div class="row">
-        <form method="post" action="/web/alerts/toggle">
-          <button class="{"secondary" if alerts_enabled else ""}" type="submit">{"暂停飞书推送" if alerts_enabled else "开启飞书推送"}</button>
-        </form>
         <form method="post" action="/web/monitor/run-once"><button type="submit">立即监控一次</button></form>
         <form method="post" action="/web/alerts/test"><button class="secondary" type="submit">测试飞书提醒</button></form>
       </div>
+      <form class="toggle-form" method="post" action="/web/alerts/toggle">
+        <button class="toggle-button" type="submit" title="打开或暂停飞书 A级提醒推送">
+          <span>{"开" if alerts_enabled else "关"}</span>
+          <span class="switch {"on" if alerts_enabled else ""}"><span class="knob"></span></span>
+        </button>
+      </form>
     </div>
     <div class="panel">
       <h2>各平台数据库存量</h2>
