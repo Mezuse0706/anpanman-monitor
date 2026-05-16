@@ -5,7 +5,7 @@ from urllib.parse import quote_plus
 
 from fastapi import Depends, FastAPI, Form, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
-from sqlalchemy import desc
+from sqlalchemy import case, desc
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -169,7 +169,7 @@ def dashboard(
     total_items = item_query.count()
     total_pages = max((total_items + page_size - 1) // page_size, 1)
     page = min(page, total_pages)
-    level_rank = sqlfunc.case(
+    level_rank = case(
         (Item.alert_level == "A", 3),
         (Item.alert_level == "B", 2),
         (Item.alert_level == "C", 1),
