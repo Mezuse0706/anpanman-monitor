@@ -65,9 +65,15 @@ def test_proxy_support_marks_amazon_as_direct_purchase() -> None:
 def test_meruki_url_uses_domestic_proxy_entrypoints() -> None:
     yahoo = meruki_url("https://auctions.yahoo.co.jp/item/abc", "アンパンマン 三輪車")
     mercari = meruki_url("https://jp.mercari.com/item/abc", "アンパンマン 三輪車")
-    assert yahoo.startswith("https://meruki.cn/mall/yahoo?")
-    assert mercari.startswith("https://meruki.cn/mall/mercari?")
-    assert "%E3%82%A2%E3%83%B3%E3%83%91%E3%83%B3%E3%83%9E%E3%83%B3" in yahoo
+    assert yahoo.startswith("https://meruki.cn/mall/yahoo/detail/")
+    assert "auctions.yahoo.co.jp" in yahoo
+    assert mercari == "https://meruki.cn/mall/mercari/detail/abc"
+
+
+def test_meruki_url_falls_back_to_search_keywords() -> None:
+    url = meruki_url("https://example.com/item/abc", "アンパンマン 三輪車")
+    assert url.startswith("https://meruki.cn/search?keywords=")
+    assert "%E3%82%A2%E3%83%B3%E3%83%91%E3%83%B3%E3%83%9E%E3%83%B3" in url
 
 
 def test_domestic_proxy_sources_are_registered() -> None:

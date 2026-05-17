@@ -1,4 +1,4 @@
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import quote, quote_plus, urlparse
 
 
 DOMESTIC_PROXY_NOTE = "国内用户建议优先用挖煤姬等国内平台成交；Buyee/ZenMarket 仅作备用入口。"
@@ -19,15 +19,26 @@ def proxy_support(platform: str) -> tuple[bool, bool, str]:
 
 
 def meruki_url(product_url: str, title: str) -> str:
-    host = urlparse(product_url).netloc
+    parsed = urlparse(product_url)
+    host = parsed.netloc
+    path_parts = [part for part in parsed.path.split("/") if part]
+    encoded_url = quote(product_url, safe="")
     query = quote_plus(title)
     if "mercari" in host:
-        return f"https://meruki.cn/mall/mercari?keyword={query}"
+        item_id = path_parts[-1] if path_parts else ""
+        if item_id:
+            return f"https://meruki.cn/mall/mercari/detail/{quote(item_id, safe='')}"
+        return f"https://meruki.cn/search?keywords={query}"
     if "yahoo" in host or "auctions" in host:
-        return f"https://meruki.cn/mall/yahoo?keyword={query}"
+        return f"https://meruki.cn/mall/yahoo/detail/{encoded_url}"
+    if "fril" in host:
+        item_id = path_parts[-1] if path_parts else ""
+        if item_id:
+            return f"https://meruki.cn/mall/rakuma/detail/{quote(item_id, safe='')}"
+        return f"https://meruki.cn/search?keywords={query}"
     if "rakuten" in host:
-        return f"https://meruki.cn/mall/rakuten?keyword={query}"
-    return f"https://meruki.cn/search/pool?keyword={query}"
+        return f"https://meruki.cn/mall/rakuten/detail/{encoded_url}"
+    return f"https://meruki.cn/search?keywords={query}"
 
 
 def buyee_url(product_url: str, title: str) -> str:
