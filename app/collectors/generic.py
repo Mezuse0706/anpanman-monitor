@@ -3,7 +3,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from app.collectors.base import PlatformConfig, PublicPageCollector, now_utc, parse_price_yen
+from app.collectors.base import FetchStats, PlatformConfig, PublicPageCollector, now_utc, parse_price_yen
 from app.schemas import RawItem
 
 SUPPORTED_CURRENCIES = ("JPY", "HKD")
@@ -229,3 +229,23 @@ class RakutenCollector(GenericCardCollector):
 
 class AmazonJapanCollector(GenericCardCollector):
     config = PlatformConfig("amazon_japan", "https://www.amazon.co.jp", "/s?k={keyword}")
+
+
+class MerukiCollector(GenericCardCollector):
+    config = PlatformConfig("meruki", "https://meruki.cn", "/search/pool?keyword={keyword}")
+
+
+class LekutaoCollector(PublicPageCollector):
+    config = PlatformConfig("lekutao_app", "https://apps.apple.com", "/cn/app/id6478657714")
+
+    async def fetch(self, keyword: str) -> tuple[list[RawItem], FetchStats]:
+        return [], FetchStats(
+            platform=self.config.name,
+            keyword=keyword,
+            success=False,
+            items_found=0,
+            error="乐酷淘目前未确认到可公开抓取的 Web 搜索页，先作为 App/成交入口记录。",
+        )
+
+    def parse(self, keyword: str, soup: BeautifulSoup, source_url: str) -> list[RawItem]:
+        return []

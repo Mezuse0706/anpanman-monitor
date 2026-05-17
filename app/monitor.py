@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 from app.collectors.base import FetchStats
 from app.collectors.generic import (
     AmazonJapanCollector,
+    LekutaoCollector,
+    MerukiCollector,
     MercariCollector,
     RakumaCollector,
     RakutenCollector,
@@ -28,6 +30,8 @@ COLLECTORS = [
     RakumaCollector(),
     RakutenCollector(),
     AmazonJapanCollector(),
+    MerukiCollector(),
+    LekutaoCollector(),
 ]
 
 

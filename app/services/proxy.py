@@ -9,6 +9,10 @@ def proxy_support(platform: str) -> tuple[bool, bool, str]:
         return False, False, "Amazon 通常直接在 Amazon 页面购买，代理搜索仅作参考。"
     if platform == "rakuma":
         return False, True, f"Rakuma 可先尝试国内平台搜索；{DOMESTIC_PROXY_NOTE}"
+    if platform == "meruki":
+        return False, False, "这条来自挖煤姬补充源，优先打开商品链接在挖煤姬内核对。"
+    if platform == "lekutao_app":
+        return False, False, "乐酷淘目前作为 App/成交入口记录，公开 Web 搜索源暂不可用。"
     if platform in {"yahoo_auctions_japan", "mercari_japan", "rakuten_japan"}:
         return True, True, DOMESTIC_PROXY_NOTE
     return False, True, f"未知平台，优先打开原商品链接核对；{DOMESTIC_PROXY_NOTE}"

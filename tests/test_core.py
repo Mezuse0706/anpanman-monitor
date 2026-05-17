@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 from app.collectors.base import FetchStats, PublicPageCollector, parse_price_yen
 from app.collectors.generic import _extract_json_ld_items
 from app.monitor import aggregate_fetch_stats
+from app.monitor import COLLECTORS
 from app.schemas import ProfitInput, RawItem
 from app.services.currency import format_price, format_yen_cny, hkd_to_cny, hkd_to_yen, yen_to_cny
 from app.services.catalog import identify_category, normalize_title_for_sku, sku_from_title
@@ -67,6 +68,12 @@ def test_meruki_url_uses_domestic_proxy_entrypoints() -> None:
     assert yahoo.startswith("https://meruki.cn/mall/yahoo?")
     assert mercari.startswith("https://meruki.cn/mall/mercari?")
     assert "%E3%82%A2%E3%83%B3%E3%83%91%E3%83%B3%E3%83%9E%E3%83%B3" in yahoo
+
+
+def test_domestic_proxy_sources_are_registered() -> None:
+    platform_names = {collector.config.name for collector in COLLECTORS}
+    assert "meruki" in platform_names
+    assert "lekutao_app" in platform_names
 
 
 def test_feishu_alert_setting_toggle() -> None:

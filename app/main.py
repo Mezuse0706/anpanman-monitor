@@ -142,6 +142,8 @@ PLATFORM_LABELS: dict[str, str] = {
     "rakuma": "Rakuma",
     "rakuten_japan": "Rakuten",
     "amazon_japan": "Amazon Japan",
+    "meruki": "挖煤姬",
+    "lekutao_app": "乐酷淘",
 }
 
 
