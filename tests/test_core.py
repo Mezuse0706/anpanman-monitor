@@ -92,7 +92,8 @@ def test_meruki_proxy_helper_page_contains_copyable_source_link() -> None:
         params={"url": "https://auctions.yahoo.co.jp/jp/auction/test", "title": "アンパンマン"},
     )
     assert response.status_code == 200
-    assert "挖煤姬购买助手" in response.text
+    assert "复制链接去挖煤姬" in response.text
+    assert "复制原商品链接" in response.text
     assert "https://auctions.yahoo.co.jp/jp/auction/test" in response.text
 
 

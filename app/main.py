@@ -316,7 +316,7 @@ def render_item(item: Item) -> str:
     buyee_supported, zen_supported, proxy_note = proxy_support(item.platform)
     meruki_button = (
         f'<a class="button secondary" href="/proxy/meruki?url={quote_plus(item.product_url)}&title={quote_plus(item.title)}" '
-        f'target="_blank" rel="noreferrer">挖煤姬购买助手</a>'
+        f'target="_blank" rel="noreferrer">复制链接去挖煤姬</a>'
     )
     buyee_button = (
         f'<a class="button secondary" href="{escape(item.buyee_url)}" target="_blank" rel="noreferrer">Buyee搜索</a>'
@@ -500,20 +500,41 @@ def proxy_buyee(q: str) -> RedirectResponse:
 @app.get("/proxy/meruki", response_class=HTMLResponse)
 def proxy_meruki(url: str, title: str = "") -> HTMLResponse:
     direct_url = meruki_url(url, title)
+    escaped_url = escape(url)
+    escaped_title = escape(title)
     content = f"""
 <div class="panel stack">
-  <h2>挖煤姬购买助手</h2>
-  <p class="muted">挖煤姬网页端不一定接受外部商品深链。如果下方详情链接仍回到首页，就复制原商品链接，到挖煤姬顶部搜索框粘贴搜索。</p>
+  <h2>复制链接去挖煤姬</h2>
+  <p class="muted">挖煤姬网页端详情跳转不稳定。最稳流程是先复制原商品链接，再打开挖煤姬 App 或网页，在顶部搜索框粘贴搜索。</p>
   <div class="row">
-    <a class="button" href="{escape(direct_url)}" target="_blank" rel="noreferrer">尝试打开挖煤姬详情</a>
+    <button type="button" onclick="copyText('source-url')">复制原商品链接</button>
+    <button class="secondary" type="button" onclick="copyText('source-title')">复制商品标题</button>
     <a class="button secondary" href="https://meruki.cn/?lang=zhCn" target="_blank" rel="noreferrer">打开挖煤姬首页</a>
-    <a class="button secondary" href="{escape(url)}" target="_blank" rel="noreferrer">打开原商品</a>
+    <a class="button secondary" href="{escaped_url}" target="_blank" rel="noreferrer">打开原商品</a>
   </div>
   <label>原商品链接</label>
-  <textarea readonly onclick="this.select()" style="min-height:70px;">{escape(url)}</textarea>
+  <textarea id="source-url" readonly onclick="this.select()" style="min-height:70px;">{escaped_url}</textarea>
   <label>商品标题</label>
-  <textarea readonly onclick="this.select()" style="min-height:90px;">{escape(title)}</textarea>
-  <p class="muted">点击文本框会自动选中，按 Ctrl+C 复制。</p>
+  <textarea id="source-title" readonly onclick="this.select()" style="min-height:90px;">{escaped_title}</textarea>
+  <details>
+    <summary>高级：尝试网页详情</summary>
+    <p class="muted">如果它仍然回到首页，说明挖煤姬网页端不接受外部深链，继续使用复制链接流程。</p>
+    <a class="button secondary" href="{escape(direct_url)}" target="_blank" rel="noreferrer">尝试打开挖煤姬详情</a>
+  </details>
+  <p class="muted" id="copy-status">手机上如果无法自动复制，点文本框后长按复制。</p>
 </div>
+<script>
+async function copyText(id) {{
+  const el = document.getElementById(id);
+  el.focus();
+  el.select();
+  try {{
+    await navigator.clipboard.writeText(el.value);
+    document.getElementById('copy-status').textContent = '已复制，打开挖煤姬后粘贴搜索。';
+  }} catch (err) {{
+    document.getElementById('copy-status').textContent = '已选中文本，请手动复制。';
+  }}
+}}
+</script>
 """
     return HTMLResponse(page_shell(content))
