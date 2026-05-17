@@ -314,7 +314,10 @@ def render_item(item: Item) -> str:
     margin = "未计算" if item.gross_margin_percent is None else f"{item.gross_margin_percent:.2f}%"
     image = f'<img src="{escape(item.image_url)}" alt="" style="max-width:120px;border-radius:6px;">' if item.image_url else ""
     buyee_supported, zen_supported, proxy_note = proxy_support(item.platform)
-    meruki_button = f'<a class="button secondary" href="{escape(meruki_url(item.product_url, item.title))}" target="_blank" rel="noreferrer">挖煤姬搜索</a>'
+    meruki_button = (
+        f'<a class="button secondary" href="/proxy/meruki?url={quote_plus(item.product_url)}&title={quote_plus(item.title)}" '
+        f'target="_blank" rel="noreferrer">挖煤姬购买助手</a>'
+    )
     buyee_button = (
         f'<a class="button secondary" href="{escape(item.buyee_url)}" target="_blank" rel="noreferrer">Buyee搜索</a>'
         if buyee_supported else '<span class="tag">Buyee不适用</span>'
@@ -492,3 +495,25 @@ def monitor_once(db: Session = Depends(get_db)) -> dict:
 @app.get("/proxy/buyee")
 def proxy_buyee(q: str) -> RedirectResponse:
     return RedirectResponse(f"https://buyee.jp/item/search/query/{quote_plus(q)}")
+
+
+@app.get("/proxy/meruki", response_class=HTMLResponse)
+def proxy_meruki(url: str, title: str = "") -> HTMLResponse:
+    direct_url = meruki_url(url, title)
+    content = f"""
+<div class="panel stack">
+  <h2>挖煤姬购买助手</h2>
+  <p class="muted">挖煤姬网页端不一定接受外部商品深链。如果下方详情链接仍回到首页，就复制原商品链接，到挖煤姬顶部搜索框粘贴搜索。</p>
+  <div class="row">
+    <a class="button" href="{escape(direct_url)}" target="_blank" rel="noreferrer">尝试打开挖煤姬详情</a>
+    <a class="button secondary" href="https://meruki.cn/?lang=zhCn" target="_blank" rel="noreferrer">打开挖煤姬首页</a>
+    <a class="button secondary" href="{escape(url)}" target="_blank" rel="noreferrer">打开原商品</a>
+  </div>
+  <label>原商品链接</label>
+  <textarea readonly onclick="this.select()" style="min-height:70px;">{escape(url)}</textarea>
+  <label>商品标题</label>
+  <textarea readonly onclick="this.select()" style="min-height:90px;">{escape(title)}</textarea>
+  <p class="muted">点击文本框会自动选中，按 Ctrl+C 复制。</p>
+</div>
+"""
+    return HTMLResponse(page_shell(content))

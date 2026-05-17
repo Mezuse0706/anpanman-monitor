@@ -82,6 +82,20 @@ def test_domestic_proxy_sources_are_registered() -> None:
     assert "lekutao_app" in platform_names
 
 
+def test_meruki_proxy_helper_page_contains_copyable_source_link() -> None:
+    from app.main import app
+    from fastapi.testclient import TestClient
+
+    client = TestClient(app)
+    response = client.get(
+        "/proxy/meruki",
+        params={"url": "https://auctions.yahoo.co.jp/jp/auction/test", "title": "アンパンマン"},
+    )
+    assert response.status_code == 200
+    assert "挖煤姬购买助手" in response.text
+    assert "https://auctions.yahoo.co.jp/jp/auction/test" in response.text
+
+
 def test_feishu_alert_setting_toggle() -> None:
     from sqlalchemy import create_engine
     from sqlalchemy.orm import Session, sessionmaker
