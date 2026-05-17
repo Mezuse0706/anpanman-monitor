@@ -12,7 +12,7 @@ from app.services.currency import format_price, format_yen_cny, hkd_to_cny, hkd_
 from app.services.catalog import identify_category, normalize_title_for_sku, sku_from_title
 from app.services.dedupe import build_dedupe_key
 from app.services.profit import calculate_profit
-from app.services.proxy import proxy_support
+from app.services.proxy import meruki_url, proxy_support
 from app.services.scoring import HIGH_VALUE_TERMS, RARE_TERMS, _age_minutes, score_item
 from app.services.settings import feishu_alerts_enabled, set_feishu_alerts_enabled
 
@@ -59,6 +59,14 @@ def test_proxy_support_marks_amazon_as_direct_purchase() -> None:
     assert buyee_supported is False
     assert zen_supported is False
     assert "Amazon" in note
+
+
+def test_meruki_url_uses_domestic_proxy_entrypoints() -> None:
+    yahoo = meruki_url("https://auctions.yahoo.co.jp/item/abc", "アンパンマン 三輪車")
+    mercari = meruki_url("https://jp.mercari.com/item/abc", "アンパンマン 三輪車")
+    assert yahoo.startswith("https://meruki.cn/mall/yahoo?")
+    assert mercari.startswith("https://meruki.cn/mall/mercari?")
+    assert "%E3%82%A2%E3%83%B3%E3%83%91%E3%83%B3%E3%83%9E%E3%83%B3" in yahoo
 
 
 def test_feishu_alert_setting_toggle() -> None:

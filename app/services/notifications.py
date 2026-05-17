@@ -3,6 +3,7 @@ import httpx
 from app.core.config import get_settings
 from app.models import Item
 from app.services.currency import format_price
+from app.services.proxy import meruki_url
 
 
 def format_feishu_text(item: Item) -> str:
@@ -18,6 +19,7 @@ def format_feishu_text(item: Item) -> str:
         f"稀缺分: {item.scarcity_score}\n"
         f"预估毛利: {margin}\n"
         f"商品链接: {item.product_url}\n"
+        f"挖煤姬: {meruki_url(item.product_url, item.title)}\n"
         f"Buyee: {item.buyee_url}\n"
         f"ZenMarket: {item.zenmarket_url}"
     )

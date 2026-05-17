@@ -21,7 +21,7 @@ from app.services.catalog import identify_category
 from app.services.history import price_stats, sku_from_title
 from app.services.notifications import send_feishu_test_message
 from app.services.profit import calculate_profit
-from app.services.proxy import proxy_support
+from app.services.proxy import meruki_url, proxy_support
 from app.services.settings import feishu_alerts_enabled, set_feishu_alerts_enabled
 
 DEFAULT_KEYWORDS = [
@@ -312,6 +312,7 @@ def render_item(item: Item) -> str:
     margin = "未计算" if item.gross_margin_percent is None else f"{item.gross_margin_percent:.2f}%"
     image = f'<img src="{escape(item.image_url)}" alt="" style="max-width:120px;border-radius:6px;">' if item.image_url else ""
     buyee_supported, zen_supported, proxy_note = proxy_support(item.platform)
+    meruki_button = f'<a class="button secondary" href="{escape(meruki_url(item.product_url, item.title))}" target="_blank" rel="noreferrer">挖煤姬搜索</a>'
     buyee_button = (
         f'<a class="button secondary" href="{escape(item.buyee_url)}" target="_blank" rel="noreferrer">Buyee搜索</a>'
         if buyee_supported else '<span class="tag">Buyee不适用</span>'
@@ -336,6 +337,7 @@ def render_item(item: Item) -> str:
   {image}
   <div class="row" style="margin-top:10px;">
     <a class="button" href="{escape(item.product_url)}" target="_blank" rel="noreferrer">商品链接</a>
+    {meruki_button}
     {buyee_button}
     {zen_button}
   </div>
